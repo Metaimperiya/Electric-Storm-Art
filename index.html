@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lightning Bolts ⚡⛈️</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Wix+Madefor+Display:wght@800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --page-background: linear-gradient(
+        110deg,
+        oklch(58% 0.28 255) 0%,
+        oklch(42% 0.34 295) 100%
+      );
+      --fallback-background: linear-gradient(110deg, #0077ff 0%, #7b00ff 100%);
+    }
+
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+      background-color: rgb(6, 6, 6);
+      background: var(--fallback-background);
+      background: var(--page-background);
+      height: 100vh;
+      font-family: "Wix Madefor Display", sans-serif;
+      color: white;
+      overflow: hidden;
+    }
+
+    h1 {
+      font-size: 3.5vw;
+      margin: 0 0 10px 0;
+      text-shadow: 2px 4px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Еще больше увеличена ширина рамки и граница */
+    .picture-frame {
+      border: black solid 50px; 
+      box-shadow: 6px 18px 40px 6px rgba(0, 0, 0, 0.85);
+      margin: 10px;
+      width: 85%;
+      max-width: 1400px;
+      aspect-ratio: 16 / 9;
+      position: relative;
+      background: white;
+      box-sizing: border-box;
+    }
+
+    .matte {
+      background-image: url(https://images.pexels.com/photos/3244513/pexels-photo-3244513.jpeg);
+      background-size: cover;
+      box-shadow: inset 5px 5px 16px 0px rgba(0, 0, 0, 0.75);
+      position: absolute;
+      top: 4%;
+      left: 4%;
+      right: 0;
+      bottom: 0;
+      width: 92%;
+      height: 92%;
+    }
+
+    #main {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Lightning bolts ⚡⛈️</h1>
+  
+  <div class="picture-frame">
+    <div class="matte">
+      <canvas id="main"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("main");
+    const context = canvas.getContext("2d");
+
+    let canvasWidth = 0.0;
+    let canvasHeight = 0.0;
+    let canvasScale = 1.2;
+    let lastFrameTime = performance.now();
+    let flashOpacity = 0.0;
+
+    const boltFlashDuration = 0.25;
+    const boltFadeDuration = 1.2;
+    const totalBoltDuration = boltFlashDuration + boltFadeDuration;
+
+    const bolts = [];
+    const raindrops = [];
+
+    class Raindrop {
+      constructor(ctx, x, y) {
+        this.ctx = ctx;
+        this.x = x;
+        this.y = y;
+        this.speed = 2 + Math.random() * 4;
+        this.length = 2 + Math.random() * 7;
+        this.opacity = 0.3 + Math.random() * 0.4;
+      }
+
+      fall() {
+        this.y += this.speed;
+        if (this.y > this.ctx.canvas.height * 0.7) {
+          this.y = 0;
+          this.x = Math.random() * this.ctx.canvas.width;
+        }
+      }
+
+      draw() {
+        this.ctx.globalAlpha = 1.0;
+        this.ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
+        this.ctx.lineWidth = 0.5;
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.x, this.y);
+        this.ctx.lineTo(this.x, this.y + this.length);
+        this.ctx.stroke();
+      }
+    }
+
+    const createRaindrops = (count) => {
+      if (raindrops.length > 1000) return;
+      for (let i = 0; i < count; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        raindrops.push(new Raindrop(context, x, y));
+      }
+    };
+
+    const animateRaindrops = () => {
+      raindrops.forEach((raindrop) => {
+        raindrop.draw();
+        raindrop.fall();
+      });
+    };
+
+    const setCanvasSize = () => {
+      const parentBoundingRect = canvas.parentElement.getBoundingClientRect();
+
+      canvas.setAttribute("width", parentBoundingRect.width);
+      canvas.setAttribute("height", parentBoundingRect.height);
+
+      for (const bolt of bolts) {
+        bolt.canvas.width = parentBoundingRect.width;
+        bolt.canvas.height = parentBoundingRect.height;
+      }
+
+      canvasWidth = Math.ceil(parentBoundingRect.width / canvasScale);
+      canvasHeight = Math.ceil(parentBoundingRect.height / canvasScale);
+    };
+
+    const launchBolt = (x, y, length, direction) => {
+      flashOpacity = 0.15 + Math.random() * 0.2;
+
+      const parentBoundingRect = canvas.parentElement.getBoundingClientRect();
+      const boltCanvas = document.createElement("canvas");
+      boltCanvas.width = parentBoundingRect.width;
+      boltCanvas.height = parentBoundingRect.height;
+      const canvasContext = boltCanvas.getContext("2d");
+      canvasContext.scale(canvasScale, canvasScale);
+
+      bolts.push({ canvas: boltCanvas, duration: 0.0 });
+
+      recursiveLaunchBolt(x, y, length, direction, canvasContext);
+    };
+
+    const recursiveLaunchBolt = (x, y, length, direction, canvasContext) => {
+      const originalDirection = direction;
+      const boltInterval = setInterval(() => {
+        if (length <= 0) {
+          clearInterval(boltInterval);
+          return;
+        }
+
+        for (let i = 0; i < Math.floor(45 / canvasScale) && length > 0; i++) {
+          const x1 = Math.floor(x);
+          const y1 = Math.floor(y);
+          x += Math.cos(direction);
+          y -= Math.sin(direction);
+          length--;
+
+          if (x1 !== Math.floor(x) || y1 !== Math.floor(y)) {
+            const alpha = Math.min(1.0, length / 350.0);
+            canvasContext.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            canvasContext.fillRect(x1, y1, 1.0, 1.0);
+
+            direction =
+              originalDirection +
+              (-Math.PI / 8.0 + Math.random() * (Math.PI / 4.0));
+
+            if (Math.random() > 0.98) {
+              recursiveLaunchBolt(
+                x1,
+                y1,
+                length * (0.3 + Math.random() * 0.4),
+                originalDirection +
+                  (-Math.PI / 6.0 + Math.random() * (Math.PI / 3.0)),
+                canvasContext
+              );
+            } else if (Math.random() > 0.95) {
+              recursiveLaunchBolt(
+                x1,
+                y1,
+                length,
+                originalDirection +
+                  (-Math.PI / 6.0 + Math.random() * (Math.PI / 3.0)),
+                canvasContext
+              );
+              length = 0;
+            }
+          }
+        }
+      }, 30);
+    };
+
+    let lightningTimer = 0;
+    const raindropInterval = 0.5;
+    let raindropTimer = 0;
+
+    const tick = () => {
+      const frameTime = performance.now();
+      const elapsed = (frameTime - lastFrameTime) / 1000;
+      lastFrameTime = frameTime;
+
+      context.clearRect(0.0, 0.0, canvas.width, canvas.height);
+      animateRaindrops();
+
+      lightningTimer += elapsed;
+      if (lightningTimer >= 2 && Math.random() > 0.95) {
+        const x = Math.floor(-10.0 + Math.random() * (canvasWidth + 20.0));
+        const y = Math.floor(5.0 + Math.random() * (canvasHeight / 3.0));
+        const length = Math.floor(
+          canvasHeight / 2.0 + Math.random() * (canvasHeight / 3.0)
+        );
+        launchBolt(x, y, length, (Math.PI * 3.0) / 2.0);
+        lightningTimer = 0;
+      }
+
+      if (flashOpacity > 0.0) {
+        context.fillStyle = `rgba(255, 255, 255, ${flashOpacity})`;
+        context.fillRect(0.0, 0.0, canvas.width, canvas.height);
+        flashOpacity = Math.max(0.0, flashOpacity - 2.0 * elapsed);
+      }
+
+      raindropTimer += elapsed;
+      if (raindropTimer >= raindropInterval) {
+        createRaindrops(5);
+        raindropTimer = 0;
+      }
+
+      for (let i = 0; i < bolts.length; i++) {
+        const bolt = bolts[i];
+        bolt.duration += elapsed;
+
+        if (bolt.duration >= totalBoltDuration) {
+          bolts.splice(i, 1);
+          i--;
+          continue;
+        }
+
+        context.globalAlpha = Math.max(
+          0.0,
+          Math.min(1.0, (totalBoltDuration - bolt.duration) / boltFadeDuration)
+        );
+        context.drawImage(bolt.canvas, 0.0, 0.0);
+      }
+
+      requestAnimationFrame(tick);
+    };
+
+    window.addEventListener("resize", setCanvasSize);
+    setCanvasSize();
+    createRaindrops(50);
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
